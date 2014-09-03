@@ -1,3 +1,22 @@
 BirdCrunch is a Perl utility to Analyse Bird Survey Data.
 
-copyleft: Kenneth Anderson Nature Society
+Till an extensive README is prepared, please use the inline comments in the code to use the script :)
+
+
+REFERENCES
+----------
+ioc_bli.xls:
+Praveen J., Jayapal, R., Pittie, A., 2013. A Checklist of Birds of India - Non Rarities. Downloaded from http://www.indianbirds.in 
+
+ioc211_edited.xls:
+India List by Rajah Jayapal, Ph.D, based in IOC List v2.11
+
+Guild Analysis:
+Based on Raman et al. (1998) and Praveen and Nameer (2009)
+
+
+Contact:
+George Tom
+georgetom080 at gmail dot com
+Kenneth Anderson Nature Society
+kans.org.in
