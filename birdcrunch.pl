@@ -1,3 +1,14 @@
+# WARNING! This script is under development; use at your own risk!!
+
+
+# The script can be used/extended to convert raw data from transects into various formats for analysis.
+# It can also generate ebird-checklist-format csvs for uploading the data into ebird.org
+
+# The script needs inputs files in xls format in the same folder it is excecuted from.
+# Inout datasheet file and lookup files are mandatory.
+
+# This version user a separate IOC-BLI-Clements lookup file to make the ebird list. Future versions are planned to have a single lookup file.
+
 use strict;
 use IO::Handle;
 use Term::ANSIColor;
@@ -5,44 +16,76 @@ use Spreadsheet::ParseExcel;
 use Spreadsheet::WriteExcel;
 use Spreadsheet::WriteExcel::Utility;
 use Scalar::Util::Numeric qw(isint);
+use List::Util qw(min max);
 STDOUT->autoflush(1);
 
-our $lookup_file 						= "ioc211_edited.xls";
-our $lookup_ioc_col 				= "1";
-our $lookup_order_col 			= "2";
-our $lookup_family_col 			= "3";
-our $lookup_cmnname_col 		= "4";
-our $lookup_sciname_col 		= "5";
-our $lookup_endemic_col 		= "6";
-our $lookup_guild_col 			= "8";
-our $lookup_redlist_col 		= "9";
-our $lookup_biome_col 			= "10";
-our $lookup_range_col 			= "11";
+# Survey Name
+our $surveyname =	"Mankulam Bird Survey, 2009.";
+our $areaname   =	"Mankulam";
 
-our $datasheet_file 				= "datasheet.xls";
-our $datasheet_camp_col			= "1";
-our $datasheet_transect_col	= "2";
-our $datasheet_time_col			= "3";
-our $datasheet_bird_col			= "4";
-our $datasheet_num_col			= "5";
-our $datasheet_db1_col			= "6";
-our $datasheet_db2_col			= "7";
-our $datasheet_db3_col			= "8";
-our $datasheet_db4_col			= "9";
-our $datasheet_habitat_col	= "10";
-our $datasheet_remarks_col	= "11";
+# Output filename
+our $output_file =	"mankulam_analysis_george1.xls";
 
-our $checklist_file 	  		= "camp_checklist.xls";
-our $checklist_camp_col			= "1";
-our $checklist_bird_col			= "2";
-our $checklist_sciname_col	= "3";
+# Switch ON/OFF (1/0) the sheets to be added in the output
+my $Transect_Datasheet                = 1;
+my $Checklist                         = 0;
+my $Abundance_Species                 = 1;
+my $Abundance_Family                  = 1;
+my $Abundance_Order                   = 1;
+my $Birds_Endemic_to_India            = 1;
+my $Guild_Analysis                    = 1;
+my $Redlisted_Species                 = 1;
+my $IBCN_Biome_Restricted_Assemblage  = 1;
+my $IBCN_Range_Restricted_Species     = 1;
+my $Shannon_and_Simpson_Indices       = 1;
+my $Bray_Curtis_from_Abundance        = 1;
+my $Bray_Curtis_from_Checklist        = 1;
+my $Dips                              = 0;
+my $Ebird                             = 1;
 
-our $look_for_dips_file 	  = "southindia_list.xls";
+# Filename and column positions of the lookup sheet
+our $lookup_file        = "ioc211_edited.xls";
+our $lookup_ioc_col     = "1";
+our $lookup_order_col   = "2";
+our $lookup_family_col  = "3";
+our $lookup_cmnname_col = "4";
+our $lookup_sciname_col = "5";
+our $lookup_endemic_col = "6";
+our $lookup_guild_col   = "8";
+our $lookup_redlist_col = "9";
+our $lookup_biome_col   = "10";
+our $lookup_range_col   = "11";
+
+# Filename and column positions of the datasheet from the field
+our $datasheet_file         = "mankulam.xls";
+our $datasheet_camp_col     = "1";
+our $datasheet_date_col     = "2";
+our $datasheet_transect_col = "3";
+our $datasheet_time_col     = "4";
+our $datasheet_bird_col     = "5";
+our $datasheet_num_col      = "6";
+our $datasheet_db1_col      = "8"; # Distance Band
+our $datasheet_db2_col      = "9";
+our $datasheet_db3_col      = "10";
+our $datasheet_db4_col      = "11";
+our $datasheet_habitat_col  = "7";
+our $datasheet_remarks_col  = "12";
+our $datasheet_observers_col= "13";
+
+# Filename and column positions of checklist file
+our $checklist_file        = "blah_blah.xls";
+our $checklist_camp_col    = "1";
+our $checklist_bird_col    = "2";
+our $checklist_sciname_col = "3";
+
+# Filename and column positions of local birdlist to find out dips
+our $look_for_dips_file     = "southindia_list.xls";
 our $look_for_dips_bird_col	= "1";
 
-our $output_file						=	"analysis.xls";
+# Filename with IOC-ebird Mapping
+our $ioc_bli_file           = "ioc_bli.xls";
 
-
+# Internal Variable Declarations
 our %birds = ();
 our @bird_names = ();
 our @bird_orders = ();
@@ -54,14 +97,24 @@ our @redlists = ();
 our @biomes = ();
 our @ranges = ();
 our @birds_dips = ();
+our @survey_checklist = ();
+our %date = ();
+our %observers = ();
 
 our @data = ();
 our @camps = ();
+our %transects = ();
+our @camp_transects = ();
+our @camp_camp = ();
+our @start_times;
+our @end_times;
+our @durations;
 our @birds_in_datasheet = ();
 our %camp_checklist_from_datasheet = ();
 our %camp_checklist = ();
 
 our %birdcount;
+our %ebirdcount;
 our %ordercount;
 our %familycount;
 our %endemiccount;
@@ -70,6 +123,7 @@ our %redlistcount;
 our %biomecount;
 our %rangecount;
 our %camp_species_count = ();
+our %ebirdofioc = ();;
 
 our $abundance_sigma_row_number;
 our $checklist_sigma_row_number;
@@ -84,11 +138,11 @@ parseDatasheet();
 print "Datasheet has ", $#data+1, " entries and ", $#birds_in_datasheet+1, " species (including groupings like Warbler sp) across ", $#camps+1, " camps.\n\n";
 
 # Compare with a more comprehensive list
-parseCampChecklist();
-foreach my $camp (@camps) {	print "$camp: ", $#{$camp_checklist{$camp}}+1, " ";} print "species parsed from checklist.\n";
+parseCampChecklist(), if ($Checklist);
+foreach my $camp (@camps) {	print "$camp: ", $#{$camp_checklist{$camp}}+1, " ", if ($Checklist);} print "species parsed from checklist.\n", if ($Checklist);
 
-# Compare with a more comprehensive list
-checkForDips();
+# Generate IOC to Clements/ebird table
+makeEbirdTable(), if ($Ebird);
 
 # Sum of guilds etc
 sumItAllUp();
@@ -121,12 +175,17 @@ sub generateXLS {
 	my $sumstart;
 	my $sumend;
 	my $formula;
-
+	my $checklist;
+	my $braycurtis_i;
+	my $sigma_camp1;
+	my $sigma_camp2;
+	my $bray_curtis_coeff;
 
   # Open new file for analysed data
 	my $workbook = Spreadsheet::WriteExcel->new($output_file);
-	print "Generating $output_file\n";
+	print "\nWriting results to $output_file\n";
 
+if ($Transect_Datasheet) {
 	# Sheet1: Transect Datasheet
 	print "Sheet1:  Transect Datasheet";
 	my $worksheet1 = $workbook->add_worksheet("Datasheet");
@@ -141,8 +200,9 @@ sub generateXLS {
 		$row_number++;
 	}
 	print color("green"), "                            [DONE]\n", color("reset");
+}
 
-
+if ($Checklist) {
 	# Sheet2: Checklist
 	print "Sheet2:  Checklist";
 	my $worksheet2 = $workbook->add_worksheet("Checklist");
@@ -153,7 +213,8 @@ sub generateXLS {
 	$row_number = 1;
 	foreach my $bird_in_datasheet (@bird_names) {
 
-		if (isint $birds{$bird_in_datasheet}->{ioc}) { # Skip Warbler sp etc for checklist
+		#if (isint $birds{$bird_in_datasheet}->{ioc}) { # Skip Warbler sp etc for checklist
+		if (1) {
 
 			my $write = 0;
 			@row_values = ();
@@ -161,10 +222,13 @@ sub generateXLS {
 				if ($birdcount{$camp}->{$bird_in_datasheet}) {
 					$camp_species_count{$camp}++;
 					$write = 1;
-					push @row_values, "x";
+					push @row_values, $birdcount{$camp}->{$bird_in_datasheet};
+					#push @row_values, "x";
+					push (@survey_checklist, $bird_in_datasheet), unless (grep(/^$bird_in_datasheet$/, @survey_checklist))
 				} elsif (grep(/^$bird_in_datasheet$/, @{$camp_checklist{$camp}})) {
 					$write = 1;
 					push @row_values, "X";
+					push (@survey_checklist, $bird_in_datasheet), unless (grep(/^$bird_in_datasheet$/, @survey_checklist));
 				} else {
 					push @row_values, " ";
 				}
@@ -172,7 +236,8 @@ sub generateXLS {
 			
 			if (($birdcount{Total}->{$bird_in_datasheet}) or ($write)) {
 				$write = 1;
-				push @row_values, "x";
+				#push @row_values, "x";
+				push @row_values, $birdcount{Total}->{$bird_in_datasheet};
 			} else {
 				push @row_values, " ";
 			}
@@ -192,7 +257,8 @@ sub generateXLS {
 	foreach my $i (0 .. $#camps+1) {
 		$from_cell 	= xl_rowcol_to_cell(1, $col_number);
 		$to_cell 		= xl_rowcol_to_cell($row_number-1, $col_number);
-		$formula = sprintf("=COUNTIF($from_cell:$to_cell,\"=x\")");
+		#$formula = sprintf("=COUNTIF($from_cell:$to_cell,\"=x\")");
+		$formula = sprintf("=SUM($from_cell:$to_cell)");
 		push @row_values, $formula;
 		$col_number++;
 	}
@@ -201,8 +267,9 @@ sub generateXLS {
   $checklist_sigma_row_number = $row_number;
 
 	print color("green"), "                                     [DONE]\n", color("reset");
+}
 
-
+if ($Abundance_Species) {
 	# Sheet3: Abundance: Species
 	print "Sheet3:  Abundance: Species";
 	my $worksheet3 = $workbook->add_worksheet("Abundance_Species");
@@ -248,8 +315,10 @@ sub generateXLS {
   $abundance_sigma_row_number = $row_number;
 
 	print color("green"), "                            [DONE]\n", color("reset");
+}
 
 
+if ($Abundance_Family) {
 	# Sheet4: Abundance: Family
 	print "Sheet4:  Abundance: Family";
 	my $worksheet4 = $workbook->add_worksheet("Abundance_Family");
@@ -294,8 +363,9 @@ sub generateXLS {
 	$worksheet4->write_row($row_number, 0, \@row_to_write);
 
 	print color("green"), "                             [DONE]\n", color("reset");
+}
 
-
+if ($Abundance_Order) {
 	# Sheet5: Abundance: Order
 	print "Sheet5:  Abundance: Order";
 	my $worksheet5 = $workbook->add_worksheet("Abundance_Order");
@@ -340,8 +410,9 @@ sub generateXLS {
 	$worksheet5->write_row($row_number, 0, \@row_to_write);
 
 	print color("green"), "                              [DONE]\n", color("reset");
+}
 
-
+if ($Birds_Endemic_to_India) {
 	# Sheet6: Endemic Analysis
 	print "Sheet6:  Birds Endemic to India";
 	my $worksheet6 = $workbook->add_worksheet("India_Endemic");
@@ -372,8 +443,9 @@ sub generateXLS {
 		$row_number++;
 	}
 	print color("green"), "                        [DONE]\n", color("reset");
+}
 
-
+if ($Guild_Analysis) {
 	# Sheet7: Guild Analysis
 	print "Sheet7:  Guild Analysis";
 	my $worksheet7 = $workbook->add_worksheet("Guild_Analysis");
@@ -419,8 +491,9 @@ sub generateXLS {
 
 
 	print color("green"), "                                [DONE]\n", color("reset");
+}
 
-
+if ($Redlisted_Species) {
 	# Sheet8: Redlist Analysis
 	print "Sheet8:  Redlisted Species";
 	my $worksheet8 = $workbook->add_worksheet("Redlist");
@@ -451,9 +524,9 @@ sub generateXLS {
 		$row_number++;
 	}
 	print color("green"), "                             [DONE]\n", color("reset");
+}
 
-
-
+if ($IBCN_Biome_Restricted_Assemblage) {
 	# Sheet9: Biome Analysis
 	print "Sheet9:  IBCN Biome Restricted Assemblage";
 	my $worksheet9 = $workbook->add_worksheet("Biome_Analysis");
@@ -484,8 +557,9 @@ sub generateXLS {
 		$row_number++;
 	}
 	print color("green"), "              [DONE]\n", color("reset");
+}
 
-
+if ($IBCN_Range_Restricted_Species) {
 	# Sheet10: Range Analysis
 	print "Sheet10: IBCN Range Restricted Species";
 	my $worksheet10 = $workbook->add_worksheet("Range_Analysis");
@@ -516,8 +590,9 @@ sub generateXLS {
 		$row_number++;
 	}
 	print color("green"), "                 [DONE]\n", color("reset");
+}
 
-
+if ($Shannon_and_Simpson_Indices) {
 	# Sheet11: Shannon Index
 	print "Sheet11: Shannon and Simpson Indices";
 	my $worksheet11 = $workbook->add_worksheet("Shannon_Index");
@@ -655,24 +730,219 @@ sub generateXLS {
 	$worksheet11->write_row($row_number, 0, \@row_to_write);
 
 	print color("green"), "                   [DONE]\n", color("reset");
+}
 
+if ($Bray_Curtis_from_Abundance) {
+	# Sheet12: Bray Curtis from Abundance
+	print "Sheet12: Bray Curtis from Abundance";;
+	my $worksheet12 = $workbook->add_worksheet("BrayCurtis_Abundance");
 
-	# Sheet12: Dips
-	print "Sheet12: Dips";
-	my $worksheet12 = $workbook->add_worksheet("Dips");
+	@row_to_write = ("Camp", @camps);
+	$worksheet12->write_row(0, 0, \@row_to_write);
+
+	$row_number = 1;
+	foreach my $camp1 (@camps) {
+		@row_values = ();
+		foreach my $camp2 (@camps) {
+			$braycurtis_i = 0;
+			$sigma_camp1 = 0;
+			$sigma_camp2 = 0;
+			$bray_curtis_coeff = 0;
+			#print "\n\n\nCAMPS: $camp1 $camp2\n\n";
+			foreach my $bird_in_datasheet (@birds_in_datasheet) {
+				
+				$braycurtis_i = $braycurtis_i + 2*min($birdcount{$camp1}->{$bird_in_datasheet}, $birdcount{$camp2}->{$bird_in_datasheet});
+				#print "Bird: $bird_in_datasheet\t C1: $birdcount{$camp1}->{$bird_in_datasheet}\t$birdcount{$camp2}->{$bird_in_datasheet}\tSigma: $braycurtis_i\n";
+				$sigma_camp1 = $sigma_camp1 + $birdcount{$camp1}->{$bird_in_datasheet};
+				$sigma_camp2 = $sigma_camp2 + $birdcount{$camp2}->{$bird_in_datasheet};
+				#$birdcount{$camp1}->{$bird_in_datasheet};
+			}
+			$bray_curtis_coeff = $braycurtis_i/($sigma_camp1+$sigma_camp2)*100;
+			#print "THE VAL: $bray_curtis_coeff\n";
+			push @row_values, $bray_curtis_coeff;
+		}
+		@row_to_write = ("$camp1", @row_values);
+		$worksheet12->write_row($row_number, 0, \@row_to_write);
+	  $row_number++;
+	}
+
+	print color("green"), "                    [DONE]\n", color("reset");
+}
+
+if ($Bray_Curtis_from_Checklist) {
+	# Sheet13: Bray Curtis from Checklist
+	print "Sheet13: Bray Curtis from Checklist";;
+	my $worksheet13 = $workbook->add_worksheet("BrayCurtis_Checklist");
+
+	@row_to_write = ("Camp", @camps);
+	$worksheet13->write_row(0, 0, \@row_to_write);
+
+	$row_number = 1;
+	foreach my $camp1 (@camps) {
+		@row_values = ();
+		foreach my $camp2 (@camps) {
+			$checklist;
+			$braycurtis_i = 0;
+			$sigma_camp1 = 0;
+			$sigma_camp2 = 0;
+			$bray_curtis_coeff = 0;
+			#print "\n\n\nCAMPS: $camp1 $camp2\n\n";
+			foreach my $bird_in_datasheet (@birds_in_datasheet) {
+
+				if (($birdcount{$camp1}->{$bird_in_datasheet} > 0) and ($birdcount{$camp2}->{$bird_in_datasheet} > 0)) {
+					$checklist = 1;
+				} else {
+					$checklist = 0;
+				}
+				$braycurtis_i = $braycurtis_i + 2*$checklist;
+				$sigma_camp1++, if ($birdcount{$camp1}->{$bird_in_datasheet} > 0);
+				$sigma_camp2++, if ($birdcount{$camp2}->{$bird_in_datasheet} > 0);
+				#print "Bird: $bird_in_datasheet\t C1: $birdcount{$camp1}->{$bird_in_datasheet}\t$birdcount{$camp2}->{$bird_in_datasheet}\tCheck: $checklist\t Sigma: $braycurtis_i\n";
+				#$birdcount{$camp1}->{$bird_in_datasheet};
+			}
+			$bray_curtis_coeff = $braycurtis_i/($sigma_camp1+$sigma_camp2)*100;
+			#print "THE VAL: $bray_curtis_coeff\n";
+			push @row_values, $bray_curtis_coeff;
+		}
+		@row_to_write = ("$camp1", @row_values);
+		$worksheet13->write_row($row_number, 0, \@row_to_write);
+	  $row_number++;
+	}
+
+	print color("green"), "                    [DONE]\n", color("reset");
+}
+
+if ($Dips) {
+	# Sheet14: Dips
+	print "Sheet14: Dips";
+	my $worksheet14 = $workbook->add_worksheet("Dips");
+
+  # Compare with a more comprehensive list
+  checkForDips();
 
 	@row_to_write = ("No", "IOC No", "Dip");
-	$worksheet12->write_row(0, 0, \@row_to_write);
+	$worksheet14->write_row(0, 0, \@row_to_write);
 
 	$row_number = 1;
 	foreach my $bird_dip (@birds_dips) {
 
 		@row_to_write = ($row_number, $birds{$bird_dip}->{ioc}, $bird_dip);
-		$worksheet12->write_row($row_number, 0, \@row_to_write);
+		$worksheet14->write_row($row_number, 0, \@row_to_write);
 		$row_number++;
 	}
 
 	print color("green"), "                                          [DONE]\n", color("reset");
+}
+
+if ($Ebird) {
+	# Sheet15: Ebird
+	print "Sheet15: Ebird Checklist Format";
+	my $worksheet15 = $workbook->add_worksheet("Ebird");
+
+	my @fill;
+	my @dates;
+	my @notes;
+	my @num_observers,;
+	my $campxtransect = 0;
+
+  foreach my $camp (@camps) {
+    foreach my $transect (@{$transects{$camp}}) {
+		  $campxtransect++;
+      push (@camp_transects, "$camp"."_"."$transect");
+      push (@dates, $date{"$camp"."_"."$transect"});
+			push (@notes, "Observed by ".$observers{"$camp"."_"."$transect"}.". $surveyname");
+			my @observers_list = split (",", $observers{"$camp"."_"."$transect"});
+			push (@num_observers, $#observers_list+1);
+      push (@camp_camp, "$areaname--$camp");
+    }
+  }
+
+	#my $campxtransect = ($#camps+1) * ($#transects{$camp}+1);
+	$row_number = 0;
+	@row_to_write = ("", "", @camp_camp);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Latitude");
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Longitude");
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	#@row_to_write = ("Date", "", @camp_transects);
+	@row_to_write = ("Date", "", @dates);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Start Time", "", @start_times);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@fill = ("TN") x $campxtransect;
+	@row_to_write = ("State", "", @fill);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@fill = ("IN") x $campxtransect;
+	@row_to_write = ("Country", "", @fill);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@fill = ("Traveling") x $campxtransect;
+	@row_to_write = ("Protocol", "", @fill);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Num Observers", "", @num_observers);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Duration (min)", "", @durations);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@fill = ("Y") x $campxtransect;
+	@row_to_write = ("All Obs Reported (Y/N)", "", @fill);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Dist Traveled (Miles)");
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Area Covered (Acres)");
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	@row_to_write = ("Notes", "", @notes);
+	$worksheet15->write_row($row_number, 0, \@row_to_write);
+	$row_number++;
+
+	foreach my $bird_in_datasheet (@birds_in_datasheet) {
+
+		@row_values = ();
+		foreach my $camp_transect (@camp_transects) {
+      if ($ebirdcount{$camp_transect}->{$bird_in_datasheet}) {
+        push @row_values, $ebirdcount{$camp_transect}->{$bird_in_datasheet};
+      } else {
+        push @row_values, "";
+      }
+		} # camp
+
+		if ($ebirdofioc{$bird_in_datasheet}) {
+		  @row_to_write = ($ebirdofioc{$bird_in_datasheet}, "", @row_values);
+	  } else {
+		  @row_to_write = ($bird_in_datasheet, "", @row_values);
+	  }
+
+		$worksheet15->write_row($row_number, 0, \@row_to_write);
+		$row_number++;
+	}
+
+	print color("green"), "                        [DONE]\n", color("reset");
+}
 
 
 
@@ -781,6 +1051,8 @@ sub parseDatasheet {
 	my @birdname_nomatch = ();
 	my @birdname_match = ();
 	my @row_contents;
+	my $prev_transect = "none";
+	my $prev_time = "00:00";
 
 	print "\nReading entries from datasheet $datasheet_file";
 
@@ -812,6 +1084,7 @@ sub parseDatasheet {
 
 			push @data, {	camp 			=> $row_contents[$datasheet_camp_col-1],
 										transect 	=> $row_contents[$datasheet_transect_col-1],
+										date 			=> $row_contents[$datasheet_date_col-1],
 										time 			=> $row_contents[$datasheet_time_col-1],
 										bird 			=> $row_contents[$datasheet_bird_col-1],
 										num 			=> $row_contents[$datasheet_num_col-1],
@@ -832,12 +1105,44 @@ sub parseDatasheet {
 				push @birdname_nomatch, $row_contents[$datasheet_bird_col-1], unless (grep(/^$row_contents[$datasheet_bird_col-1]$/, @birdname_nomatch));
 			}
 
+
+			if ($row_contents[$datasheet_transect_col-1] ne $prev_transect) {
+				push @start_times, $row_contents[$datasheet_time_col-1];
+				push @end_times, $prev_time, unless ($prev_time eq "00:00");
+				#print "\nTransect Change: $row_contents[$datasheet_camp_col-1] $row_contents[$datasheet_camp_col-1]  Now: $row_contents[$datasheet_time_col-1]  Last: $prev_time\n";
+			}
+			$prev_transect = $row_contents[$datasheet_transect_col-1];
+			$prev_time = $row_contents[$datasheet_time_col-1];
+
+
 			# Make an array of all camps
 			unless (grep(/^$row_contents[$datasheet_camp_col-1]$/, @camps)) {
 				push @camps, $row_contents[$datasheet_camp_col-1];
 			}
 
+			# Make an array of all transects
+			unless (grep(/^$row_contents[$datasheet_transect_col-1]$/, @{$transects{$row_contents[$datasheet_camp_col-1]}})) {
+				push @{$transects{$row_contents[$datasheet_camp_col-1]}}, $row_contents[$datasheet_transect_col-1];
+			}
+
+			# Assign Date and observers to camp_transect
+			my $camp_transect_var = "$row_contents[$datasheet_camp_col-1]"."_"."$row_contents[$datasheet_transect_col-1]";
+			$date{$camp_transect_var} = $row_contents[$datasheet_date_col-1];
+			$observers{$camp_transect_var} = $row_contents[$datasheet_observers_col-1];
+
 		} # Row
+		push @end_times, $row_contents[$datasheet_time_col-1];
+
+		foreach my $i (0 .. $#start_times) {
+			my @hrmin_start = split (/[:\.]/, $start_times[$i]);
+			my $hrminval_start = $hrmin_start[0]*60 + $hrmin_start[1];
+			my @hrmin_end = split (/[:\.]/, $end_times[$i]);
+			my $hrminval_end = $hrmin_end[0]*60 + $hrmin_end[1];
+			#print "$start_times[$i] - $end_times[$i]  ", $hrminval_end-$hrminval_start, "\n";
+			push @durations, $hrminval_end-$hrminval_start;
+		}
+		
+
 		print color("green"), "           [DONE]\n", color("reset");
 	} # Worksheets
 
@@ -912,18 +1217,11 @@ sub parseCampChecklist {
 }
 
 
-
-
-
-
-
 # Parse the datasheet
 sub checkForDips {
 
 	my @birds_look_for_dips = ();
   my @row_contents = ();
-
-	print "\nChecking for Dips in $look_for_dips_file";
 
 	# Open IOC File
 	my $parser    = Spreadsheet::ParseExcel->new();
@@ -954,16 +1252,63 @@ sub checkForDips {
 	} # Worksheets
 
 	foreach my $bird (@birds_look_for_dips) {
-		push @birds_dips, $bird, unless (grep(/^$bird$/, @birds_in_datasheet));
+
+		if ($Checklist) {
+			push @birds_dips, $bird, unless (grep(/^$bird$/, @survey_checklist));
+		} else {
+			push @birds_dips, $bird, unless (grep(/^$bird$/, @birds_in_datasheet));
+		}
+	}
+}
+
+
+# Parse the datasheet
+sub makeEbirdTable {
+
+  my @row_contents = ();
+
+	print "\nMaking the IOC-eBird/Clements Lookup";
+
+	# Open IOC File
+	my $parser    = Spreadsheet::ParseExcel->new();
+	my $workbook  = $parser->parse($ioc_bli_file);
+
+	if (!defined $workbook) {
+		die $parser->error(), ": $ioc_bli_file?\n";
 	}
 
-	print color("green"), "               [DONE]\n\n", color("reset");
+	for my $worksheet ($workbook->worksheets() ) {
+		my ($row_min, $row_max) = $worksheet->row_range();
+		my ($col_min, $col_max) = $worksheet->col_range();
+		
+		for my $row ($row_min .. $row_max) {
+			@row_contents = ();
+			for my $col ($col_min .. $col_max) {
+				my $cell = $worksheet->get_cell($row, $col);
+				if ($cell) {
+					push @row_contents, $cell->value;
+				} else {
+					push @row_contents, "-";
+				}
+			} # Col
+
+			#print "$row_contents[0]   $row_contents[4]\n";
+			$ebirdofioc{$row_contents[0]} = $row_contents[4];
+		} # Row
+	} # Worksheets
+
+		print color("green"), "                   [DONE]\n", color("reset");
+
 }
+
+
+
+
 
 
 sub sumItAllUp {
  
-	print "Analysing Data";
+	print "\n\nAnalysing Data";
 
   # Take each line of datasheet one by one
 	foreach my $datum (@data) {
@@ -974,11 +1319,13 @@ sub sumItAllUp {
 		}
 		$ordercount{Total}->{$birds{$$datum{bird}}->{order}} = $ordercount{Total}->{$birds{$$datum{bird}}->{order}} + $$datum{num};
 
+
 		# FAMILY Count (Per camp and total)
 		foreach my $camp (@camps) {
 			$familycount{$camp}->{$birds{$$datum{bird}}->{family}} = $familycount{$camp}->{$birds{$$datum{bird}}->{family}} + $$datum{num}, if ($$datum{camp} eq "$camp");
 		}
 		$familycount{Total}->{$birds{$$datum{bird}}->{family}} = $familycount{Total}->{$birds{$$datum{bird}}->{family}} + $$datum{num};
+
 
 		# SPECIES Count (Per camp and total)
 		foreach my $camp (@camps) {
@@ -986,11 +1333,20 @@ sub sumItAllUp {
 		}
 		$birdcount{Total}->{$$datum{bird}} = $birdcount{Total}->{$$datum{bird}} + $$datum{num};
 
+
+		# SPECIES Count (Per camp_transect for EBIRD)
+		foreach my $camp (@camps) {
+		  my $camp_transect = "$camp"."_"."$$datum{transect}";
+			$ebirdcount{$camp_transect}->{$$datum{bird}} = $ebirdcount{$camp_transect}->{$$datum{bird}} + $$datum{num}, if ($$datum{camp} eq "$camp");
+		}
+
+
 		# ENDEMIC Count (Per camp and total)
 		foreach my $camp (@camps) {
 			$endemiccount{$camp}->{$birds{$$datum{bird}}->{endemic}} = $endemiccount{$camp}->{$birds{$$datum{bird}}->{endemic}} + $$datum{num}, if ($$datum{camp} eq "$camp");
 		}
 		$endemiccount{Total}->{$birds{$$datum{bird}}->{endemic}} = $endemiccount{Total}->{$birds{$$datum{bird}}->{endemic}} + $$datum{num};
+
 
 		# GUILD Count (Per camp and total)
 		foreach my $camp (@camps) {
@@ -998,17 +1354,20 @@ sub sumItAllUp {
 		}
 		$guildcount{Total}->{$birds{$$datum{bird}}->{guild}} = $guildcount{Total}->{$birds{$$datum{bird}}->{guild}} + $$datum{num};
 
+
 		# Redlist Count (Per camp and total)
 		foreach my $camp (@camps) {
 			$redlistcount{$camp}->{$birds{$$datum{bird}}->{redlist}} = $redlistcount{$camp}->{$birds{$$datum{bird}}->{redlist}} + $$datum{num}, if ($$datum{camp} eq "$camp");
 		}
 		$redlistcount{Total}->{$birds{$$datum{bird}}->{redlist}} = $redlistcount{Total}->{$birds{$$datum{bird}}->{redlist}} + $$datum{num};
 
+
 		# BIOME Count (Per camp and total)
 		foreach my $camp (@camps) {
 			$biomecount{$camp}->{$birds{$$datum{bird}}->{biome}} = $biomecount{$camp}->{$birds{$$datum{bird}}->{biome}} + $$datum{num}, if ($$datum{camp} eq "$camp");
 		}
 		$biomecount{Total}->{$birds{$$datum{bird}}->{biome}} = $biomecount{Total}->{$birds{$$datum{bird}}->{biome}} + $$datum{num};
+
 
 		# RANGE Count (Per camp and total)
 		foreach my $camp (@camps) {
