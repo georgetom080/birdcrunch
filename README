@@ -1,6 +1,14 @@
 BirdCrunch is a Perl utility to Analyse Bird Survey Data.
 
-Till an extensive README is prepared, please use the inline comments in the code to use the script :)
+
+USAGE
+-----
+Copy the lookup file (birdcrunch_lookup.xls) and the script (birdcrunch.pl) in the same folder as the survey datasheet.
+A sample survey sheet is provided in the git folder to reference.
+Open birdcrunch.pl and provide the survey name, datasheet filename, output filename, checklist filename (optional) analysis required, column numbers etc.
+Run the script by 'perl birdcrunch.pl'
+
+Till an extensive README is prepared, please use the inline comments in the code for any more information :)
 
 
 REFERENCES
