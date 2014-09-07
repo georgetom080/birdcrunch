@@ -5,17 +5,15 @@ Till an extensive README is prepared, please use the inline comments in the code
 
 REFERENCES
 ----------
-ioc_bli.xls:
-Praveen J., Jayapal, R., Pittie, A., 2013. A Checklist of Birds of India - Non Rarities. Downloaded from http://www.indianbirds.in 
-
-ioc211_edited.xls:
-India List by Rajah Jayapal, Ph.D, based in IOC List v2.11
-
-Guild Analysis:
-Based on Raman et al. (1998) and Praveen and Nameer (2009)
+Praveen J., Jayapal, R., Pittie, A., 2013. A Checklist of Birds of India - Non Rarities.
+IUCN Red List - BirdLife list of Threatened Birds of India (updated by IBCN till 28 July 2014)
+Western Ghat Endemics - Western Ghat Endemics-IOC 4.3
+India Endemics - according to Jaypal, R. Summary of IOC Bird List v. 2.11.
+Biome Representative and Range Specific Assemblage - According to IBA Book, IBCN.
+Feeding Guilds - Based on Raman et al. (1998) and Praveen and Nameer (2009)
 
 
-Contact:
+Contact: (especially if you have review comments, would like to extend this, build a gui, or make this work in Windows)
 George Tom
 georgetom080 at gmail dot com
 Kenneth Anderson Nature Society
