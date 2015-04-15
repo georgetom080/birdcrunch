@@ -1,39 +1,34 @@
 BirdCrunch is a Perl utility to Analyse Bird Survey Data.
 
-
 USAGE
 -----
+birdcrunch_lookup.xls and birdcrunch.pl forms the core of BirdCrunch Utility.
+
 Copy the lookup file (birdcrunch_lookup.xls) and the script (birdcrunch.pl) in the same folder as the survey datasheet.
-
-A sample survey sheet is provided in the git folder to reference, the survey datasheet should be in a format similar to this..
-
+A sample survey sheet sample_datasheet.xls is provided in the git folder to reference, the survey datasheet should be in a format similar to this..
 Open birdcrunch.pl and provide the survey name, datasheet filename, output filename, checklist filename (optional) analysis required, column numbers etc.
-
 Run the script by 'perl birdcrunch.pl'. A new excel sheet with analysis is created in the same folder.
 
+This folder also has the following miscellaneous utilities:
+R_commands      : R commands to plot Bray-Curtis Similarity Dendrogram and NNDS
+latlong.pl      : Perl code to convert various forms of GPS cord to dd.ddddd
+replace_bird.pl : Perl code to replace (with correct nomenclature) the birdnames in a datasheet
+compare_file.pl : Perl code to print the differential between two text files
 
 Till an extensive README is prepared, please use the inline comments in the code for any more information :)
 
 
-
 REFERENCES
 ----------
-Praveen J., Jayapal, R., Pittie, A., 2013. A Checklist of Birds of India - Non Rarities.
-
+Praveen J., Jayapal, R., Pittie, A., 2015. A Checklist of Birds of India - Non Rarities. Version 3.00. Downloaded from http://www.birdcount.in
 IUCN Red List - BirdLife list of Threatened Birds of India (updated by IBCN till 28 July 2014)
-
 Western Ghat Endemics - Western Ghat Endemics-IOC 4.3
-
 India Endemics - according to Jaypal, R. Summary of IOC Bird List v. 2.11.
-
 Biome Representative and Range Specific Assemblage - According to IBA Book, IBCN.
-
 Feeding Guilds - Based on Raman et al. (1998) and Praveen and Nameer (2009)
 
 
-
 Contact (especially if you have review comments, would like to extend this, build a gui, or make this work in Windows):
-
 George Tom
 georgetom080 at gmail dot com
 Kenneth Anderson Nature Society
