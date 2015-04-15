@@ -1,6 +1,6 @@
 # WARNING! This script is under development; use at your own risk!!
 
-# The script can be used to replace the birdnames in sheet1 according to the corrections given in sheet2
+# The script can be used to replace the birdnames in datasheet_file according to the corrections given in correction_file
 
 use strict;
 use IO::Handle;
@@ -12,14 +12,14 @@ use Scalar::Util::Numeric qw(isint);
 use List::Util qw(min max);
 STDOUT->autoflush(1);
 
-# Filenames 
-our $datasheet_file  = "Sacred_Groves/Sacred_Groves_datasheet.xls";
-our $birdname_col    = 8;
-our $correction_file = "Sacred_Groves/To_Replace.xls";
-our $output_file     = "Sacred_Groves/Sacred_Groves_datasheet_edited.xls";
+# Filenames and Fields
+our $datasheet_file  = "Original_Datasheet.xls";
+our $birdname_col    = 5;
+our $correction_file = "Correction_File.xls";
+our $output_file     = "Edited_Datasheet.xls";
 
 
-our $lookup_file     = "birdcrunch_lookup_hnm.xls";
+our $lookup_file     = "birdcrunch_lookup.xls";
 our $lookup_ioc_col         = "1";
 our $lookup_cmnname_col     = "4";
 our $lookup_sciname_col     = "5";
