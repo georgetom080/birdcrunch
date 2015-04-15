@@ -1,0 +1,67 @@
+############################
+# ABUNDANCE (ENCOUNTER-RATE)
+############################
+
+# Get the entries
+bird <- read.csv("abundance.csv", header = TRUE, row.names = 1)
+
+# Fill Empty Cells with 0
+bird[is.na(bird)] <- 0
+
+# Take transpose
+camp <- data.frame(t(bird))
+
+# calculate Bray-Curtis distance among samples
+camp.bc.dist <- vegdist(camp, method = "bray")
+
+
+# cluster communities using average-linkage algorithm
+camp.bc.clust <- hclust(camp.bc.dist, method = "average")
+
+
+svg(file="BrayCurtis_EncounterRate.svg");
+
+# plot cluster diagram
+plot(camp.bc.clust, main = "Bray Curtis Dissimilarity (from encounter-rate)", ylab = "Bray-Curtis Dissimilarity (from encounter-rate)", hang = -1)
+dev.off()
+
+svg(file="NDMS_EncounterRate.svg");
+# NMDS
+bci.mds<-metaMDS(camp, distance = "bray", k = 2, trymax = 20, autotransform =TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+plot(bci.mds, choices = c(1, 2), type="n") #plots the ordination axes
+text(bci.mds, display = c("sites"))
+dev.off()
+
+
+
+##################################
+# CHECKLIST (presence marked as 1)
+##################################
+
+# Get the entries
+bird <- read.csv("checklist.csv", header = TRUE, row.names = 1)
+
+# Fill Empty Cells with 0
+bird[is.na(bird)] <- 0
+
+# Take transpose
+camp <- data.frame(t(bird))
+
+# calculate Bray-Curtis distance among samples
+camp.bc.dist <- vegdist(camp, method = "bray")
+
+# cluster communities using average-linkage algorithm
+camp.bc.clust <- hclust(camp.bc.dist, method = "average")
+
+svg(file="BrayCurtis_Checklist.svg");
+# plot cluster diagram
+plot(camp.bc.clust, main = "Bray Curtis Dissimilarity (from checklist)", ylab = "Bray-Curtis Dissimilarity (from checklist)", hang = -1)
+dev.off();
+
+
+svg(file="NMDS_Checklist.svg");
+# NMDS
+bci.mds<-metaMDS(camp, distance = "bray", k = 2, trymax = 20, autotransform =TRUE, noshare = 0.1, expand = TRUE, trace = 1, plot = FALSE)
+plot(bci.mds, choices = c(1, 2), type="n") #plots the ordination axes
+text(bci.mds, display = c("sites"))
+dev.off();
