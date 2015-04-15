@@ -12,6 +12,7 @@ Run the script by 'perl birdcrunch.pl'. A new excel sheet with analysis is creat
 This folder also has the following miscellaneous utilities:
 R_commands      : R commands to plot Bray-Curtis Similarity Dendrogram and NNDS
 latlong.pl      : Perl code to convert various forms of GPS cord to dd.ddddd
+transpose.pl    : Perl code to traspose checklist-form data to classicial datasheet form.
 replace_bird.pl : Perl code to replace (with correct nomenclature) the birdnames in a datasheet
 compare_file.pl : Perl code to print the differential between two text files
 
